@@ -2,7 +2,7 @@ import torch
 from torch.nn import functional as F
 import einops
 import numpy as np
-from utils import SOMGrid, tuple_checker, approximate_square_root
+from .utils import SOMGrid, tuple_checker, approximate_square_root
 
 
 # Module for quantizers. Lots of influence from OpenAI's Jukebox VQ-VAE, rosinality's VQ-VAE, and the OG paper:
@@ -32,10 +32,14 @@ class BaseQuantizer(torch.nn.Module):
         Whether to use a SOM in the codebook update.
     som_neighbor_distance : int
         The distance for neighbors in the SOM update.
+    som_kernel_type : str
+        The type of kernel to use. Either "hard" or "gaussian".
     dist_type : str
         The distance type to use for the codebook. Either "cos" or "euclidean".
     in_rvq : bool
-        Whether this quantizer is in an RVQ. Used to avoid some redundancies.
+        Whether this quantizer is in a residual vector quantizer. Used to avoid some redundancies.
+    precreated_som : torch.nn.Module
+        A precreated SOM to use in the quantizer.
     """
     def __init__(self, 
                  dim : int, 
@@ -348,6 +352,33 @@ class ResidualQuantizer(torch.nn.Module):
     https://arxiv.org/pdf/2107.03312.pdf
     
     Essentially, we quantize the encoder output, and then quantize the residual iteratively.
+
+    Parameters
+    ----------
+    num_quantizers : int
+        The number of quantizers to use.
+    dim : int
+        The dimension of the input.
+    codebook_sizes : list, int
+        The size of the codebook for each quantizer.
+    quantizer_class : str
+        The class of quantizer to use. Either "ema" or "base".
+    scale_factor : float
+        The factor by which to scale the codebook size at each step.
+    priority_n : int
+        The number of stale clusters at which to switch off codebook updates for early quantizers.
+    vq_cutoff_freq : int
+        The cutoff frequency for removing codebook vectors and replacing with inputs.
+    decorr_loss_weight : float
+        The weight of the decorrelation loss between quantizers.
+    use_som : bool
+        Whether to use a SOM in the codebook update.
+    som_kernel_type : str
+        The type of kernel to use. Either "hard" or "gaussian".
+    som_neighbor_distance : int
+        The distance for neighbors in the SOM update.
+    dist_type : str
+        The distance type to use for the codebook. Either "cos" or "e".
     """
     def __init__(self,
                  num_quantizers,
