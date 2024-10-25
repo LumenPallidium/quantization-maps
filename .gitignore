@@ -130,8 +130,8 @@ dmypy.json
 
 # folders
 /data
-/networks/tmp
-/networks/data
+/som_quantize/tmp
+/som_quantize/data
 
 # data files
 *.csv
