@@ -2,7 +2,7 @@ import torch
 from torch.nn import functional as F
 import einops
 import numpy as np
-from utils import SOMGrid, tuple_checker, approximate_square_root
+from .utils import SOMGrid, tuple_checker, approximate_square_root
 
 # Module for quantizers. Lots of influence from OpenAI's Jukebox VQ-VAE, rosinality's VQ-VAE, and the OG paper:
 # https://arxiv.org/pdf/1711.00937.pdf
