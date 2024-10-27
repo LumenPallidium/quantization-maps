@@ -2,7 +2,7 @@ import torch
 from torch.nn import functional as F
 import einops
 import numpy as np
-from .utils import SOMGrid, tuple_checker, approximate_square_root
+from utils import SOMGrid, tuple_checker, approximate_square_root
 
 # Module for quantizers. Lots of influence from OpenAI's Jukebox VQ-VAE, rosinality's VQ-VAE, and the OG paper:
 # https://arxiv.org/pdf/1711.00937.pdf
@@ -289,6 +289,10 @@ class BaseQuantizer(torch.nn.Module):
             self.cut_freq = self.cut_freq * ratio
         else:
             raise ValueError("Must specify either new cutoff or ratio")
+        
+    def get_codebook(self):
+        """Return the quantizer codebook."""
+        return self.codebook.T
 
 class EMAQuantizer(BaseQuantizer):
     """Quantizer that uses an exponential moving average to update the codebook, 
@@ -430,6 +434,7 @@ class ResidualQuantizer(torch.nn.Module):
                  priority_n = 24,
                  vq_cutoff_freq = 2,
                  decorr_loss_weight : float = 0.0,
+                 temp : float = 1e-5,
                  use_som = True,
                  probabilistic = False,
                  som_kernel_type = "hard",
@@ -468,6 +473,7 @@ class ResidualQuantizer(torch.nn.Module):
                                      use_som = use_som,
                                      probabilistic = probabilistic,
                                      dist_type = dist_type,
+                                     temp = temp,
                                      in_rvq = True,
                                      precreated_som = self.som) for codebook_size, scale in zip(self.codebook_sizes, scale_factors)]
 
@@ -478,8 +484,30 @@ class ResidualQuantizer(torch.nn.Module):
                 n = None, 
                 update_codebook : bool = False, 
                 prioritize_early : bool = False):
-        # can limit to first n quantizers, they call this bitrate dropout in the paper
-        # if n is None, use all quantizers, for training n will typically be sampled uniformly from [1, num_quantizers]
+        """
+        Quantize the input x.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor.
+        n : int
+            The number of quantizers to use. If None, use all quantizers.
+        update_codebook : bool
+            Whether to update the codebook with input vectors. If model is in training mode, codebook
+            will always update on forward pass, just not with the input vectors.
+        prioritize_early : bool
+            Whether to switch off codebook updates for early quantizers if they have too many stale clusters.
+
+        Returns
+        -------
+        x_hat : torch.Tensor
+            The quantized input.
+        indices : torch.Tensor
+            The indices of the codebook entries for each quantizer. If probabilistic, this is a distribution.
+        inner_loss : torch.Tensor
+            The commitment loss.
+        """
         if n is None:
             n = self.num_quantizers
 
@@ -512,6 +540,7 @@ class ResidualQuantizer(torch.nn.Module):
             inner_loss += inner_loss_i
             indices.append(index)
 
+        #TODO : stack fails on probablistic quantizers with different codebook sizes
         return x_hat, torch.stack(indices, dim = -1), inner_loss
     
     def get_stale_clusters(self):
@@ -531,6 +560,10 @@ class ResidualQuantizer(torch.nn.Module):
                 quantizer.cut_freq = quantizer.cut_freq * ratio
         else:
             raise ValueError("Must specify either new cutoff or ratio")
+        
+    def get_codebook(self):
+        """Returns the codebooks of all quantizers."""
+        return [quantizer.get_codebook() for quantizer in self.quantizers]
 
 
 if __name__ == "__main__":

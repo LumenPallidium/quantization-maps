@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name = "som_quantize",
-    version = "0.2.1",
+    version = "0.2.2",
     author = "Keir Havel",
     author_email = "keirhavel@live.com",
     description = "Pytorch implementation of vector quantization and self-organizing maps.",
